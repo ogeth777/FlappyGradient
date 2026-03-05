@@ -488,6 +488,37 @@
                         }
                     }
                 }
+                
+                // --- Cyberpunk Grid Effect (OpenGradient Style) ---
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.03)'; // Very subtle grid
+                ctx.lineWidth = 1;
+                const gridSize = 40;
+                const time = Date.now() * 0.0005; // Slow movement
+                
+                // Vertical lines (moving right)
+                const offsetX = (time * 20) % gridSize;
+                for(let x = offsetX; x < canvas.width; x += gridSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                }
+                
+                // Horizontal lines (moving down)
+                const offsetY = (time * 20) % gridSize;
+                for(let y = offsetY; y < canvas.height; y += gridSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
+                
+                // Gradient overlay at bottom
+                const gradient = ctx.createLinearGradient(0, canvas.height - 200, 0, canvas.height);
+                gradient.addColorStop(0, 'rgba(15, 23, 42, 0)');
+                gradient.addColorStop(1, 'rgba(14, 165, 233, 0.1)'); // Blue glow at bottom
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, canvas.height - 200, canvas.width, 200);
             }
         };
         particles.init();
