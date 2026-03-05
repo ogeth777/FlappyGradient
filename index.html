@@ -532,10 +532,10 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             // Draw Background based on state
-            if (gameState === 'START' || gameState === 'GET_READY') {
+            if (gameState === 'START') {
                  bgEffect.draw();
             } else {
-                 // Simple dark background for gameplay to avoid distraction
+                 // Simple dark background for gameplay (GET_READY and PLAYING)
                  let bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
                  bgGrad.addColorStop(0, '#0f172a'); 
                  bgGrad.addColorStop(1, '#1e293b');
