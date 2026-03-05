@@ -183,16 +183,11 @@
                 
                 <div class="flex gap-2">
                     <button id="refresh-btn" onclick="manualCheck()" class="flex-1 bg-slate-700 text-white py-2 rounded-lg text-sm font-semibold hover:bg-slate-600 transition">↻ Check Deposit</button>
-                    <button onclick="withdrawTokens()" class="flex-1 bg-rose-700 text-white py-2 rounded-lg text-sm font-semibold hover:bg-rose-600 transition">↶ Withdraw</button>
                 </div>
                 
                 <p id="status-msg" class="text-xs text-amber-400 h-5 mt-2 font-mono"></p>
 
                 <button id="play-btn" class="btn w-full" disabled>Waiting for 0.001 OPG...</button>
-                
-                <div class="mt-4 text-center">
-                    <button onclick="exportKey()" class="text-[10px] text-slate-500 hover:text-slate-300 underline">Export Private Key (Backup)</button>
-                </div>
             </div>
         </div>
     </div>
@@ -218,10 +213,7 @@
         // --- Web3 Configuration ---
         const provider = new ethers.providers.JsonRpcProvider("https://sepolia.base.org");
         const OPG_ADDRESS = "0x240b09731d96979f50b2c649c9ce10fcf9c7987f";
-        const OPG_ABI = [
-            "function balanceOf(address owner) view returns (uint256)",
-            "function transfer(address to, uint256 amount) returns (bool)"
-        ];
+        const OPG_ABI = ["function balanceOf(address owner) view returns (uint256)"];
         const MIN_DEPOSIT = 0.001;
         
         let gameWallet = null;
@@ -563,63 +555,6 @@
             } catch (err) {
                 console.error("Wallet Error:", err);
                 document.getElementById('status-msg').innerText = "Wallet Init Error";
-            }
-        }
-
-        async function withdrawTokens() {
-            if (!gameWallet) return;
-            
-            const dest = prompt("Enter the address to withdraw OPG to:");
-            if (!dest || !ethers.utils.isAddress(dest)) {
-                if (dest) alert("Invalid address!");
-                return;
-            }
-            
-            const status = document.getElementById('status-msg');
-            status.innerText = "Checking gas...";
-            
-            try {
-                // 1. Check ETH balance for gas
-                const ethBal = await provider.getBalance(gameWallet.address);
-                if (ethBal.lt(ethers.utils.parseEther("0.00005"))) {
-                    alert("⚠️ Insufficient ETH for Gas!\n\nTo withdraw OPG tokens, this game wallet needs a tiny amount of ETH (Base Sepolia) to pay network fees.\n\nPlease send ~0.0001 ETH to this wallet address.");
-                    status.innerText = "Need ETH for gas";
-                    status.className = "text-xs text-red-400 h-5 mt-2 font-mono font-bold";
-                    return;
-                }
-                
-                // 2. Send OPG
-                status.innerText = "Sending tx...";
-                const opgContract = new ethers.Contract(OPG_ADDRESS, OPG_ABI, gameWallet);
-                const balance = await opgContract.balanceOf(gameWallet.address);
-                
-                if (balance.eq(0)) {
-                    alert("No OPG to withdraw.");
-                    status.innerText = "";
-                    return;
-                }
-                
-                const tx = await opgContract.transfer(dest, balance);
-                status.innerText = "Tx Sent! Wait...";
-                alert("Withdrawal Transaction Sent!\nTx Hash: " + tx.hash);
-                
-                await tx.wait();
-                status.innerText = "Withdrawal Complete!";
-                status.className = "text-xs text-green-400 h-5 mt-2 font-mono font-bold";
-                checkBalance(); // Update UI
-                
-            } catch (err) {
-                console.error(err);
-                alert("Error: " + (err.reason || err.message));
-                status.innerText = "Error";
-            }
-        }
-
-        function exportKey() {
-            if (!gameWallet) return;
-            const confirmExport = confirm("⚠️ SECURITY WARNING ⚠️\n\nDo you want to reveal your Private Key?\n\nYou can import this key into MetaMask to control your funds fully.");
-            if (confirmExport) {
-                prompt("Copy your Private Key (Keep it safe!):", gameWallet.privateKey);
             }
         }
 
