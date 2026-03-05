@@ -490,7 +490,7 @@
                 }
                 
                 // --- Cyberpunk Grid Effect (OpenGradient Style) ---
-                ctx.strokeStyle = 'rgba(56, 189, 248, 0.03)'; // Very subtle grid
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.15)'; // Increased visibility (0.03 -> 0.15)
                 ctx.lineWidth = 1;
                 const gridSize = 40;
                 const time = Date.now() * 0.0005; // Slow movement
@@ -516,12 +516,18 @@
                 // Gradient overlay at bottom
                 const gradient = ctx.createLinearGradient(0, canvas.height - 200, 0, canvas.height);
                 gradient.addColorStop(0, 'rgba(15, 23, 42, 0)');
-                gradient.addColorStop(1, 'rgba(14, 165, 233, 0.1)'); // Blue glow at bottom
+                gradient.addColorStop(1, 'rgba(14, 165, 233, 0.2)'); // Increased glow (0.1 -> 0.2)
                 ctx.fillStyle = gradient;
                 ctx.fillRect(0, canvas.height - 200, canvas.width, 200);
             }
         };
-        particles.init();
+        
+        // Initialize particles
+        try {
+            particles.init();
+        } catch (e) {
+            console.error("Particles Init Error:", e);
+        }
 
         // Game Loop
         function loop() {
@@ -704,8 +710,14 @@
             }
         }
         
-        initWallet();
-        attractLoop();
+        initWallet().catch(err => console.error("Init Error:", err));
+        
+        // Start animation immediately
+        try {
+            attractLoop();
+        } catch(e) {
+            console.error("Anim Error:", e);
+        }
         
     </script>
 </body>
