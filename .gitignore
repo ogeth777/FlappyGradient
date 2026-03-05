@@ -1,0 +1,5 @@
+.venv/
+_backup_auditor/
+.env
+__pycache__/
+*.pyc

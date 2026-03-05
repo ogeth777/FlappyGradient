@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FlappyGradient | Web3 Play-to-Earn</title>
+    <!-- Use a more reliable CDN for Ethers.js v5 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js" type="application/javascript"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #e2e8f0;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            touch-action: none; /* Prevent zoom on mobile */
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%);
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(5px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            z-index: 50;
+            transition: opacity 0.3s;
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Gradient Text */
+        .gradient-text {
+            background: linear-gradient(90deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .btn {
+            background: linear-gradient(90deg, #0ea5e9, #2563eb);
+            border: none;
+            padding: 16px 32px;
+            color: white;
+            font-size: 20px;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-top: 24px;
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);
+            transition: all 0.2s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(14, 165, 233, 0.6);
+        }
+
+        .btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background: #334155;
+            box-shadow: none;
+        }
+
+        .wallet-box {
+            background: rgba(30, 41, 59, 0.8);
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid #38bdf8;
+            margin: 20px 0;
+            font-size: 14px;
+            color: #7dd3fc;
+            font-family: monospace;
+            max-width: 90%;
+            word-break: break-all;
+        }
+
+        .score-board {
+            position: absolute;
+            top: 10%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 64px;
+            font-weight: 900;
+            color: white;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            z-index: 20;
+            pointer-events: none;
+            opacity: 0.8;
+        }
+
+        .logo {
+            width: 120px;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 0 15px rgba(56, 189, 248, 0.5));
+        }
+
+        /* Scanline effect */
+        .scanline {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.1));
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 40;
+        }
+        
+        .tutorial {
+            position: absolute;
+            bottom: 20%;
+            width: 100%;
+            text-align: center;
+            color: rgba(255,255,255,0.6);
+            font-size: 18px;
+            animation: pulse 2s infinite;
+            pointer-events: none;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas"></canvas>
+    <div class="scanline"></div>
+    <div class="score-board hidden" id="score">0</div>
+    <div class="tutorial hidden" id="tutorial-msg">Tap / Click to Jump</div>
+
+    <!-- Start Screen -->
+    <div id="start-screen" class="overlay">
+        <div class="max-w-md w-full px-6">
+            <h1 class="text-4xl md:text-5xl font-extrabold mb-2 gradient-text tracking-tighter">FlappyGradient</h1>
+            <p class="text-blue-200 mb-8 font-medium">Web3 Play-to-Earn</p>
+            
+            <div id="wallet-section" class="bg-slate-800/50 p-6 rounded-2xl border border-slate-700 backdrop-blur-sm">
+                <p class="text-gray-300 text-sm mb-3">Deposit $OPG to Play:</p>
+                
+                <div class="flex justify-center mb-4">
+                    <div class="bg-white p-2 rounded-lg">
+                        <img id="qr-code" src="" alt="QR" class="w-32 h-32">
+                    </div>
+                </div>
+                
+                <div class="wallet-box text-xs mx-auto" id="wallet-address">Generating...</div>
+                
+                <div class="flex items-center justify-between bg-slate-900/50 p-3 rounded-lg border border-slate-700 mb-4">
+                    <span class="text-gray-400 text-xs">Balance:</span>
+                    <div class="flex items-center gap-3">
+                        <span id="balance" class="text-emerald-400 font-bold font-mono text-lg">0.0000</span>
+                        <span class="text-emerald-600 text-xs font-bold">OPG</span>
+                    </div>
+                </div>
+                
+                <div class="flex gap-2">
+                    <button id="refresh-btn" onclick="manualCheck()" class="flex-1 bg-slate-700 text-white py-2 rounded-lg text-sm font-semibold hover:bg-slate-600 transition">↻ Check Deposit</button>
+                </div>
+                
+                <p id="status-msg" class="text-xs text-amber-400 h-5 mt-2 font-mono"></p>
+
+                <button id="play-btn" class="btn w-full" disabled>Waiting for 0.001 OPG...</button>
+                
+                <!-- Demo button removed for production feel -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div id="game-over-screen" class="overlay hidden">
+        <div class="text-center">
+            <h2 class="text-5xl font-black text-white mb-2 drop-shadow-lg">GAME OVER</h2>
+            <div class="bg-slate-800/80 p-8 rounded-2xl border border-slate-600 m-6 backdrop-blur-md">
+                <p class="text-slate-400 text-sm uppercase tracking-widest mb-1">Score</p>
+                <p class="text-6xl font-black text-sky-400 mb-6" id="final-score">0</p>
+                
+                <div class="h-px bg-slate-700 w-full mb-6"></div>
+                
+                <p class="text-slate-400 text-sm uppercase tracking-widest mb-1">Tokens Earned</p>
+                <p class="text-2xl font-bold text-emerald-400 font-mono"><span id="tokens-earned">0.00</span> OPG</p>
+            </div>
+            <button onclick="goToStartScreen()" class="btn px-12">Return to Menu</button>
+        </div>
+    </div>
+
+    <script>
+        // --- Web3 Configuration ---
+        const provider = new ethers.providers.JsonRpcProvider("https://sepolia.base.org");
+        const OPG_ADDRESS = "0x240b09731d96979f50b2c649c9ce10fcf9c7987f";
+        const OPG_ABI = ["function balanceOf(address owner) view returns (uint256)"];
+        const MIN_DEPOSIT = 0.001;
+        
+        let gameWallet = null;
+        let isDeposited = false;
+
+        // --- Game Variables ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        let frames = 0;
+        let score = 0;
+        let gameState = 'START'; // START, GET_READY, PLAYING, GAMEOVER
+        let gameSpeed = 3;
+        
+        // Physics
+        const gravity = 0.08; // Super slow gravity (Floaty feel)
+        const jumpStrength = 3.0; // Adjusted jump
+
+        // Resize Canvas
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // Bird Object
+        const bird = {
+            x: 50,
+            y: canvas.height / 2,
+            radius: 18,
+            velocity: 0,
+            rotation: 0,
+            
+            draw: function() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                
+                // Smooth rotation
+                let targetRotation = (this.velocity * 0.1);
+                this.rotation += (targetRotation - this.rotation) * 0.1;
+                ctx.rotate(this.rotation);
+                
+                // Body (Gradient)
+                let grad = ctx.createRadialGradient(-5, -5, 2, 0, 0, this.radius);
+                grad.addColorStop(0, '#7dd3fc');
+                grad.addColorStop(1, '#0284c7');
+                
+                ctx.beginPath();
+                ctx.arc(0, 0, this.radius, 0, Math.PI*2);
+                ctx.fillStyle = grad;
+                ctx.fill();
+                
+                // Glow
+                ctx.shadowColor = '#0ea5e9';
+                ctx.shadowBlur = 15;
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#e0f2fe';
+                ctx.stroke();
+                ctx.shadowBlur = 0; // Reset
+
+                // Eye
+                ctx.beginPath();
+                ctx.fillStyle = 'white';
+                ctx.arc(8, -6, 6, 0, Math.PI*2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.fillStyle = '#0f172a';
+                ctx.arc(10, -6, 2, 0, Math.PI*2);
+                ctx.fill();
+                
+                // Wing
+                ctx.beginPath();
+                ctx.ellipse(-6, 4, 10, 6, -0.2, 0, Math.PI*2);
+                ctx.fillStyle = '#0369a1';
+                ctx.fill();
+
+                ctx.restore();
+            },
+            
+            update: function() {
+                // Gravity only applies in PLAYING state
+                if (gameState === 'PLAYING') {
+                    this.velocity += gravity;
+                    this.y += this.velocity;
+                } else if (gameState === 'GET_READY') {
+                    // Hover effect
+                    this.y = (canvas.height / 2) + Math.sin(frames * 0.05) * 10;
+                    this.velocity = 0;
+                    this.rotation = 0;
+                }
+
+                // Floor collision
+                if (this.y + this.radius >= canvas.height) {
+                    this.y = canvas.height - this.radius;
+                    gameOver();
+                }
+                
+                // Ceiling collision
+                if (this.y - this.radius <= 0) {
+                    this.y = this.radius;
+                    this.velocity = 0;
+                }
+            },
+            
+            flap: function() {
+                this.velocity = -jumpStrength;
+            }
+        };
+
+        // Pipes Object
+        const pipes = {
+            items: [],
+            width: 70,
+            gap: 180, // More generous gap
+            dx: 2, // Reduced from 3 to 2 for slower scrolling
+            
+            draw: function() {
+                ctx.fillStyle = '#1e293b'; // Dark slate
+                ctx.strokeStyle = '#22c55e'; // Green Neon
+                ctx.lineWidth = 3;
+                ctx.shadowColor = '#22c55e';
+                
+                for(let i = 0; i < this.items.length; i++) {
+                    let p = this.items[i];
+                    
+                    // Neon Glow only on edges
+                    ctx.shadowBlur = 10; 
+                    
+                    // Top Pipe
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillRect(p.x, 0, this.width, p.top);
+                    ctx.strokeRect(p.x, 0, this.width, p.top);
+                    
+                    // Bottom Pipe
+                    ctx.fillRect(p.x, canvas.height - p.bottom, this.width, p.bottom);
+                    ctx.strokeRect(p.x, canvas.height - p.bottom, this.width, p.bottom);
+                    
+                    ctx.shadowBlur = 0;
+                    
+                    // Detail lines
+                    ctx.fillStyle = 'rgba(34, 197, 94, 0.1)';
+                    ctx.fillRect(p.x + 10, 0, 5, p.top);
+                    ctx.fillRect(p.x + 10, canvas.height - p.bottom, 5, p.bottom);
+                }
+            },
+            
+            update: function() {
+                // Add new pipe
+                if (frames % 180 === 0) { // Spacing
+                    let maxY = canvas.height - this.gap - 100;
+                    let topHeight = Math.random() * (maxY - 50) + 50;
+                    
+                    this.items.push({
+                        x: canvas.width,
+                        top: topHeight,
+                        bottom: canvas.height - (topHeight + this.gap),
+                        passed: false
+                    });
+                }
+                
+                for(let i = 0; i < this.items.length; i++) {
+                    let p = this.items[i];
+                    p.x -= this.dx;
+                    
+                    // Collision
+                    if (
+                        bird.x + bird.radius > p.x && 
+                        bird.x - bird.radius < p.x + this.width && 
+                        (bird.y - bird.radius < p.top || bird.y + bird.radius > canvas.height - p.bottom)
+                    ) {
+                        gameOver();
+                    }
+                    
+                    // Score
+                    if (p.x + this.width < bird.x && !p.passed) {
+                        score++;
+                        p.passed = true;
+                        document.getElementById('score').innerText = score;
+                        // Speed up slightly every 5 points
+                        if(score % 5 === 0) this.dx += 0.2;
+                    }
+                    
+                    // Remove
+                    if (p.x + this.width < 0) {
+                        this.items.shift();
+                    }
+                }
+            },
+            
+            reset: function() {
+                this.items = [];
+                this.dx = 2;
+            }
+        };
+
+        // Background Particles
+        const particles = {
+            items: [],
+            
+            init: function() {
+                for(let i=0; i<50; i++) {
+                    this.items.push({
+                        x: Math.random() * canvas.width,
+                        y: Math.random() * canvas.height,
+                        size: Math.random() * 2,
+                        speed: Math.random() * 0.5 + 0.1
+                    });
+                }
+            },
+            
+            draw: function() {
+                ctx.fillStyle = 'rgba(56, 189, 248, 0.3)'; // Light blue
+                for(let p of this.items) {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
+                    ctx.fill();
+                }
+            },
+            
+            update: function() {
+                for(let p of this.items) {
+                    p.x -= p.speed;
+                    if(p.x < 0) p.x = canvas.width;
+                }
+            }
+        };
+        particles.init();
+
+        // Game Loop
+        function loop() {
+            // Clear
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw Background
+            particles.update();
+            particles.draw();
+            
+            if (gameState === 'GET_READY') {
+                bird.update();
+                bird.draw();
+            } else if (gameState === 'PLAYING') {
+                pipes.update();
+                pipes.draw();
+                bird.update();
+                bird.draw();
+                frames++;
+            }
+            
+            if (gameState !== 'GAMEOVER') {
+                requestAnimationFrame(loop);
+            }
+        }
+
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('tutorial-msg').classList.remove('hidden');
+            
+            gameState = 'GET_READY';
+            bird.x = canvas.width / 3; // Position bird slightly left
+            bird.y = canvas.height / 2;
+            
+            loop();
+        }
+
+        function handleInput() {
+            if (gameState === 'GET_READY') {
+                gameState = 'PLAYING';
+                document.getElementById('score').classList.remove('hidden');
+                document.getElementById('tutorial-msg').classList.add('hidden');
+                bird.flap();
+            } else if (gameState === 'PLAYING') {
+                bird.flap();
+            }
+        }
+
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            document.getElementById('game-over-screen').classList.remove('hidden');
+            document.getElementById('score').classList.add('hidden');
+            document.getElementById('final-score').innerText = score;
+            document.getElementById('tokens-earned').innerText = (score * 0.01).toFixed(2);
+        }
+
+        function goToStartScreen() {
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('start-screen').classList.remove('hidden');
+            
+            // Reset game state but don't start
+            bird.y = canvas.height / 2;
+            bird.velocity = 0;
+            pipes.reset();
+            score = 0;
+            frames = 0;
+            document.getElementById('score').innerText = 0;
+            
+            gameState = 'START';
+            attractLoop(); // Restart background particles
+        }
+
+        function resetGame() {
+            bird.y = canvas.height / 2;
+            bird.velocity = 0;
+            pipes.reset();
+            score = 0;
+            frames = 0;
+            document.getElementById('score').innerText = 0;
+            document.getElementById('game-over-screen').classList.add('hidden');
+            startGame(); // Go back to Get Ready
+        }
+
+        // Inputs
+        window.addEventListener('keydown', e => {
+            if(e.code === 'Space' || e.code === 'ArrowUp') handleInput();
+        });
+        window.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Stop scrolling
+            handleInput();
+        }, {passive: false});
+        window.addEventListener('mousedown', handleInput);
+
+
+        // --- Wallet Logic (Kept from previous version) ---
+        async function initWallet() {
+            try {
+                const storedKey = localStorage.getItem('fg_private_key');
+                if (storedKey) {
+                    gameWallet = new ethers.Wallet(storedKey, provider);
+                } else {
+                    gameWallet = ethers.Wallet.createRandom().connect(provider);
+                    localStorage.setItem('fg_private_key', gameWallet.privateKey);
+                }
+
+                const address = gameWallet.address;
+                document.getElementById('wallet-address').innerText = address;
+                document.getElementById('qr-code').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${address}`;
+                
+                checkBalance();
+            } catch (err) {
+                console.error("Wallet Error:", err);
+                document.getElementById('status-msg').innerText = "Wallet Init Error";
+            }
+        }
+
+        async function manualCheck() {
+            const btn = document.getElementById('refresh-btn');
+            const status = document.getElementById('status-msg');
+            btn.disabled = true;
+            btn.innerText = "Checking...";
+            status.innerText = "Querying Base Sepolia...";
+            
+            await checkBalance(true);
+            
+            setTimeout(() => {
+                btn.disabled = false;
+                btn.innerText = "↻ Check Deposit";
+                if (!isDeposited) status.innerText = "No tokens found yet.";
+            }, 1000);
+        }
+
+        function enableDemoMode() {
+            isDeposited = true;
+            const playBtn = document.getElementById('play-btn');
+            playBtn.disabled = false;
+            playBtn.innerText = "START GAME (DEMO) 🎮";
+            playBtn.onclick = startGame;
+            playBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            playBtn.classList.add('animate-pulse');
+            
+            document.getElementById('balance').innerText = "100.0";
+            document.getElementById('status-msg').innerText = "Demo Mode Active";
+            document.getElementById('status-msg').className = "text-xs text-emerald-400 h-5 mt-2 font-mono font-bold";
+        }
+
+        async function checkBalance(isManual = false) {
+            if (isDeposited) return;
+            try {
+                const opgContract = new ethers.Contract(OPG_ADDRESS, OPG_ABI, provider);
+                const balanceWei = await opgContract.balanceOf(gameWallet.address);
+                const balanceOpg = ethers.utils.formatEther(balanceWei);
+                
+                document.getElementById('balance').innerText = parseFloat(balanceOpg).toFixed(4);
+
+                if (parseFloat(balanceOpg) >= MIN_DEPOSIT) {
+                    isDeposited = true;
+                    const playBtn = document.getElementById('play-btn');
+                    playBtn.disabled = false;
+                    playBtn.innerText = "START GAME 🎮";
+                    playBtn.onclick = startGame;
+                    playBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    playBtn.classList.add('animate-pulse');
+                    
+                    const status = document.getElementById('status-msg');
+                    status.innerText = "Deposit Confirmed!";
+                    status.className = "text-xs text-emerald-400 h-5 mt-2 font-mono font-bold";
+                }
+            } catch (err) {
+                console.error("Balance Check Error:", err);
+            }
+        }
+
+        // Initial Loop for particles bg before game starts
+        function attractLoop() {
+            if (gameState === 'START') {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                particles.update();
+                particles.draw();
+                requestAnimationFrame(attractLoop);
+            }
+        }
+        
+        initWallet();
+        attractLoop();
+        
+    </script>
+</body>
+</html>
