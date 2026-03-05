@@ -221,11 +221,6 @@
             <div class="bg-slate-800/80 p-8 rounded-2xl border border-slate-600 m-6 backdrop-blur-md">
                 <p class="text-slate-400 text-sm uppercase tracking-widest mb-1">Score</p>
                 <p class="text-6xl font-black text-sky-400 mb-6" id="final-score">0</p>
-                
-                <div class="h-px bg-slate-700 w-full mb-6"></div>
-                
-                <p class="text-slate-400 text-sm uppercase tracking-widest mb-1">Tokens Earned</p>
-                <p class="text-2xl font-bold text-emerald-400 font-mono"><span id="tokens-earned">0.00</span> OPG</p>
             </div>
             <button onclick="goToStartScreen()" class="btn px-12">Return to Menu</button>
         </div>
@@ -437,29 +432,61 @@
             items: [],
             
             init: function() {
-                for(let i=0; i<50; i++) {
+                this.items = [];
+                for(let i = 0; i < 60; i++) {
                     this.items.push({
                         x: Math.random() * canvas.width,
                         y: Math.random() * canvas.height,
-                        size: Math.random() * 2,
-                        speed: Math.random() * 0.5 + 0.1
+                        size: Math.random() * 2 + 1,
+                        speedX: Math.random() * 0.5 - 0.25,
+                        speedY: Math.random() * 0.5 - 0.25,
+                        alpha: Math.random() * 0.5 + 0.1
                     });
                 }
             },
             
-            draw: function() {
-                ctx.fillStyle = 'rgba(56, 189, 248, 0.3)'; // Light blue
-                for(let p of this.items) {
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, p.size, 0, Math.PI*2);
-                    ctx.fill();
-                }
+            update: function() {
+                this.items.forEach(p => {
+                    p.x += p.speedX;
+                    p.y += p.speedY;
+                    
+                    if(p.x < 0) p.x = canvas.width;
+                    if(p.x > canvas.width) p.x = 0;
+                    if(p.y < 0) p.y = canvas.height;
+                    if(p.y > canvas.height) p.y = 0;
+                });
             },
             
-            update: function() {
-                for(let p of this.items) {
-                    p.x -= p.speed;
-                    if(p.x < 0) p.x = canvas.width;
+            draw: function() {
+                ctx.fillStyle = '#0f172a'; // Background clear
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw connecting lines
+                ctx.lineWidth = 0.5;
+                for(let i = 0; i < this.items.length; i++) {
+                    const p1 = this.items[i];
+                    
+                    // Draw particle
+                    ctx.fillStyle = `rgba(14, 165, 233, ${p1.alpha})`; // Sky blue
+                    ctx.beginPath();
+                    ctx.arc(p1.x, p1.y, p1.size, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Connect nearby particles
+                    for(let j = i + 1; j < this.items.length; j++) {
+                        const p2 = this.items[j];
+                        const dx = p1.x - p2.x;
+                        const dy = p1.y - p2.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if(dist < 100) {
+                            ctx.strokeStyle = `rgba(14, 165, 233, ${0.15 * (1 - dist/100)})`;
+                            ctx.beginPath();
+                            ctx.moveTo(p1.x, p1.y);
+                            ctx.lineTo(p2.x, p2.y);
+                            ctx.stroke();
+                        }
+                    }
                 }
             }
         };
@@ -517,7 +544,6 @@
             document.getElementById('game-over-screen').classList.remove('hidden');
             document.getElementById('score').classList.add('hidden');
             document.getElementById('final-score').innerText = score;
-            document.getElementById('tokens-earned').innerText = (score * 0.01).toFixed(2);
         }
 
         function goToStartScreen() {
