@@ -531,8 +531,17 @@
             // Clear
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
-            // Draw Background
-            bgEffect.draw();
+            // Draw Background based on state
+            if (gameState === 'START' || gameState === 'GET_READY') {
+                 bgEffect.draw();
+            } else {
+                 // Simple dark background for gameplay to avoid distraction
+                 let bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                 bgGrad.addColorStop(0, '#0f172a'); 
+                 bgGrad.addColorStop(1, '#1e293b');
+                 ctx.fillStyle = bgGrad;
+                 ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
             
             if (gameState === 'GET_READY') {
                 bird.update();
