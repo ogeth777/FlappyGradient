@@ -427,107 +427,104 @@
             }
         };
 
-        // Background Particles
-        const particles = {
-            items: [],
-            
-            init: function() {
-                this.items = [];
-                for(let i = 0; i < 60; i++) {
-                    this.items.push({
-                        x: Math.random() * canvas.width,
-                        y: Math.random() * canvas.height,
-                        size: Math.random() * 2 + 1,
-                        speedX: Math.random() * 0.5 - 0.25,
-                        speedY: Math.random() * 0.5 - 0.25,
-                        alpha: Math.random() * 0.5 + 0.1
-                    });
-                }
-            },
-            
-            update: function() {
-                this.items.forEach(p => {
-                    p.x += p.speedX;
-                    p.y += p.speedY;
-                    
-                    if(p.x < 0) p.x = canvas.width;
-                    if(p.x > canvas.width) p.x = 0;
-                    if(p.y < 0) p.y = canvas.height;
-                    if(p.y > canvas.height) p.y = 0;
-                });
-            },
+        // --- COOL 3D BACKGROUND (Synthwave / Cyberpunk Style) ---
+        const bgEffect = {
+            time: 0,
             
             draw: function() {
-                ctx.fillStyle = '#0f172a'; // Background clear
+                this.time += 0.05;
+                
+                // 1. Dark Background with subtle gradient
+                let bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                bgGrad.addColorStop(0, '#020617'); // Very dark blue
+                bgGrad.addColorStop(1, '#0f172a'); // Slate 900
+                ctx.fillStyle = bgGrad;
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                // Draw connecting lines
-                ctx.lineWidth = 0.5;
-                for(let i = 0; i < this.items.length; i++) {
-                    const p1 = this.items[i];
-                    
-                    // Draw particle
-                    ctx.fillStyle = `rgba(14, 165, 233, ${p1.alpha})`; // Sky blue
-                    ctx.beginPath();
-                    ctx.arc(p1.x, p1.y, p1.size, 0, Math.PI * 2);
-                    ctx.fill();
+                // 2. RetroWave Sun / Glow at Horizon
+                const horizonY = canvas.height * 0.6;
+                const centerX = canvas.width / 2;
+                
+                let sunGrad = ctx.createRadialGradient(centerX, horizonY, 10, centerX, horizonY, 400);
+                sunGrad.addColorStop(0, 'rgba(14, 165, 233, 0.3)'); // Sky blue glow
+                sunGrad.addColorStop(1, 'rgba(14, 165, 233, 0)');
+                ctx.fillStyle = sunGrad;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                    // Connect nearby particles
-                    for(let j = i + 1; j < this.items.length; j++) {
-                        const p2 = this.items[j];
-                        const dx = p1.x - p2.x;
-                        const dy = p1.y - p2.y;
-                        const dist = Math.sqrt(dx * dx + dy * dy);
-                        
-                        if(dist < 100) {
-                            ctx.strokeStyle = `rgba(14, 165, 233, ${0.15 * (1 - dist/100)})`;
-                            ctx.beginPath();
-                            ctx.moveTo(p1.x, p1.y);
-                            ctx.lineTo(p2.x, p2.y);
-                            ctx.stroke();
-                        }
-                    }
-                }
-                
-                // --- Cyberpunk Grid Effect (OpenGradient Style) ---
-                ctx.strokeStyle = 'rgba(56, 189, 248, 0.15)'; // Increased visibility (0.03 -> 0.15)
-                ctx.lineWidth = 1;
-                const gridSize = 40;
-                const time = Date.now() * 0.0005; // Slow movement
-                
-                // Vertical lines (moving right)
-                const offsetX = (time * 20) % gridSize;
-                for(let x = offsetX; x < canvas.width; x += gridSize) {
+                // 3. 3D Perspective Grid (The "Cool" Part)
+                ctx.save();
+                ctx.beginPath();
+                // Clip bottom area for grid
+                ctx.rect(0, horizonY, canvas.width, canvas.height - horizonY);
+                ctx.clip();
+
+                ctx.strokeStyle = '#38bdf8'; // Sky 400
+                ctx.lineWidth = 2;
+                ctx.shadowColor = '#0ea5e9'; // Sky 500
+                ctx.shadowBlur = 15; // Neon Glow
+
+                // Vertical Lines (Perspective)
+                const fov = 300;
+                for(let x = -canvas.width; x < canvas.width * 2; x += 100) {
+                    // Simple perspective: lines converge to vanishing point (centerX, horizonY)
                     ctx.beginPath();
-                    ctx.moveTo(x, 0);
-                    ctx.lineTo(x, canvas.height);
+                    ctx.moveTo(centerX, horizonY); 
+                    // Calculate bottom position based on angle
+                    // Just drawing rays from center for simplicity and speed
+                    let angle = Math.atan2(canvas.height - horizonY, x - centerX);
+                    // This is a cheat for perspective lines, but looks good
+                    ctx.moveTo(x, canvas.height);
+                    ctx.lineTo(centerX + (x - centerX) * 0.1, horizonY);
                     ctx.stroke();
                 }
+
+                // Horizontal Lines (Moving forward)
+                // Z movement simulation
+                const speed = 2;
+                const offset = (Date.now() * 0.1) % 100;
                 
-                // Horizontal lines (moving down)
-                const offsetY = (time * 20) % gridSize;
-                for(let y = offsetY; y < canvas.height; y += gridSize) {
+                for(let z = 0; z < canvas.height; z += 40) {
+                    // Exponential spacing for 3D feel
+                    // y = horizonY + (distance)
+                    // We map linear steps to exponential Y positions
+                    let p = (z + offset) / 1000; // 0 to 1
+                    if (p > 1) p -= 1;
+                    
+                    // Non-linear projection for 3D floor effect
+                    let y = horizonY + (Math.pow(p, 3) * (canvas.height - horizonY));
+                    
+                    if (y > canvas.height) continue;
+
                     ctx.beginPath();
                     ctx.moveTo(0, y);
                     ctx.lineTo(canvas.width, y);
+                    // Fade out near horizon
+                    ctx.globalAlpha = p; 
                     ctx.stroke();
                 }
+                ctx.globalAlpha = 1.0;
+                ctx.restore();
+
+                // 4. Floating Particles (Digital Dust) above horizon
+                ctx.fillStyle = '#fff';
+                ctx.shadowBlur = 5;
+                ctx.shadowColor = '#fff';
                 
-                // Gradient overlay at bottom
-                const gradient = ctx.createLinearGradient(0, canvas.height - 200, 0, canvas.height);
-                gradient.addColorStop(0, 'rgba(15, 23, 42, 0)');
-                gradient.addColorStop(1, 'rgba(14, 165, 233, 0.2)'); // Increased glow (0.1 -> 0.2)
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, canvas.height - 200, canvas.width, 200);
+                // Deterministic random using sine waves for performance
+                for(let i=0; i<30; i++) {
+                    let px = (Math.sin(i * 132.1 + this.time * 0.02) * 0.5 + 0.5) * canvas.width;
+                    let py = (Math.cos(i * 45.3 + this.time * 0.03) * 0.5 + 0.5) * horizonY;
+                    let size = Math.sin(i) * 1.5 + 1.5;
+                    
+                    ctx.globalAlpha = Math.sin(this.time + i) * 0.5 + 0.5;
+                    ctx.beginPath();
+                    ctx.arc(px, py, size, 0, Math.PI*2);
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1.0;
+                ctx.shadowBlur = 0;
             }
         };
-        
-        // Initialize particles
-        try {
-            particles.init();
-        } catch (e) {
-            console.error("Particles Init Error:", e);
-        }
 
         // Game Loop
         function loop() {
@@ -535,8 +532,7 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             // Draw Background
-            particles.update();
-            particles.draw();
+            bgEffect.draw();
             
             if (gameState === 'GET_READY') {
                 bird.update();
@@ -704,8 +700,7 @@
         function attractLoop() {
             if (gameState === 'START') {
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-                particles.update();
-                particles.draw();
+                bgEffect.draw();
                 requestAnimationFrame(attractLoop);
             }
         }
